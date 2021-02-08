@@ -1,0 +1,49 @@
+{
+  "name": "nodebb-plugin-maxonbinary",
+  "version": "0.0.1",
+  "description": "Maxon Binaries plugin",
+  "main": "library.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rgigante/nodebb-plugin-maxonbinary"
+  },
+  "keywords": [
+    "nodebb",
+    "plugin",
+    "binary"
+  ],
+  "author": {
+    "name": "Riccardo Gigante",
+    "email": "r_gigante@maxon.net"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/rgigante/nodebb-plugin-maxonbinary/issues"
+  },
+  "readme": "",
+  "readmeFilename": "README.md",
+  "dependencies": {},
+  "nbbpm": {
+    "compatibility": "^1.0.1",
+    "index": false
+  },
+  "devDependencies": {
+    "@commitlint/config-angular": "^8.3.4",
+    "eslint-config-airbnb-base": "^14.1.0",
+    "eslint-plugin-import": "^2.20.1",
+    "husky": "^4.2.3",
+    "lint-staged": "^10.0.8"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged",
+      "commit-msg": "commitlint -E HUSKY_GIT_PARAMS"
+    }
+  },
+  "lint-staged": {
+    "*.js": [
+      "eslint --fix",
+      "git add"
+    ]
+  }
+}
