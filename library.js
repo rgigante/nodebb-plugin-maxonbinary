@@ -9,6 +9,7 @@
 
 	const nconf = module.parent.require('nconf');
 	const winston = module.parent.require('winston');
+	const express = module.parent.require('express');
 
 	const constants = Object.freeze({
 		archive: nconf.get('maxon_binary:archive_path'),
@@ -31,12 +32,11 @@
 	MaxonBinary.retrieveBinary = function(params, callback) {
 		let loggedIn = false;
 		let uid = -1;
-		params.app.get(constants.archive + '/:file(*?)', function (req, res, callback) {
+		params.app.get('/api' + constants.archive + '/:file(*?)', function (req, res, callback) {
 			loggedIn = req.loggedIn;
 			// check the user to be logged in
 			if (loggedIn)
 			{
-
 				uid = req.user.uid;
 				winston.verbose('[maxonBinary] --> User (' + req.user.uid + ') is downloading ' + req.params.file);
 				// build absolute path to the file to get
