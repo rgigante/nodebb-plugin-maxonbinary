@@ -15,6 +15,17 @@
 		home: nconf.get('maxon_binary:home_path')
 	});
 
+	// check the contants object for contain data
+	let configOk = false;
+	if (!constants.home) {
+		winston.error('[maxonBinary] --> Home folder of the user starting nodebb not found.');
+	} else if (!constants.archive) {
+		winston.error('[maxonBinary] --> Archive folder containing binaries not found.');
+	} else {
+		configOk = true;
+		winston.info('[maxonBinary] --> Config is OK');
+	}
+
 	const MaxonBinary = {};
 
 	MaxonBinary.retrieveBinary = function(params, callback) {
