@@ -1,13 +1,12 @@
 {
-	"id": "nodebb-plugin-maxonid",
+	"id": "nodebb-plugin-maxonbinary",
 	"name": "Maxon Binary plugin",
-	"description": "NodeBB Plugin that allows users download Maxon Binaries.",
+	"description": "NodeBB Plugin that manages Maxon Binaries downloads.",
 	"url": "https://github.com/rgigante/nodebb-plugin-maxonbinary",
 	"library": "./library.js",
 	"hooks": [
-		{ 
-			"hook": "static:app.load", 
-			"method": "retrieveBinary" 
-		}
+		{ "hook": "static:app.load", "method": "retrieveBinary" },
+		{ "hook": "static:api.routes", "method": "initRoutes" },
+    { "hook": "filter:plugin.write-api.routes", "method": "initWriteRoutes" }
 	]
 }

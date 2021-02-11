@@ -1,6 +1,12 @@
 'use strict';
+(function(routes) {
 
-(function (module) {
+
+
+}(module.exports));
+
+
+(function (MaxonBinary) {
 
 	const fs = module.require('fs'); 
 	const User = require.main.require('./src/user');
@@ -27,12 +33,22 @@
 		winston.info('[maxonBinary] --> Config is OK');
 	}
 
-	const MaxonBinary = {};
-
-	MaxonBinary.retrieveBinary = function(params, callback) {
+	// data <- (app: app, router: params.router, middleware: middleware, controllers: controllers)
+	MaxonBinary.retrieveBinary = function(data, callback) {
 		let loggedIn = false;
 		let uid = -1;
-		params.app.get('/api' + constants.archive + '/:file(*?)', function (req, res, callback) {
+		
+		let app = data.app;
+		let router = data.router;
+		let middleware = data.middleware;
+		let controllers = data.controllers;
+
+		// console.log ("app: ", app);
+		// console.log ("router: ", router);
+		// console.log ("middleware: ", middleware);
+		// console.log ("controllers: ", controllers);
+
+		app.get('/api' + constants.archive + '/:file(*?)', function (req, res, callback) {
 			loggedIn = req.loggedIn;
 			// check the user to be logged in
 			if (loggedIn)
@@ -79,5 +95,62 @@
 		callback(null);
 	}
 
-	module.exports = MaxonBinary;
-}(module));
+	// data <- (router: pluginRouter, middleware, helpers)
+	MaxonBinary.initRoutes = function(data, callback) {
+
+		let router = data.router;
+		let middleware = data.middleware;
+		let helpers = data.helpers;
+
+		// console.log ("router: ", router);
+		// console.log ("middleware: ", middleware);
+		// console.log ("helpers: ", helpers);
+
+		router.get('/route0', function(req, res) {
+			console.log("[maxonBinary] --> isAuthenticated: ", req.isAuthenticated());
+			// console.log("[maxonBinary] --> req: ", req);
+			winston.verbose("[maxonBinary] --> /route0 reached via get");
+			res.sendStatus(200);
+		});
+
+		router.post('/route1', function(req, res) {
+			console.log("[maxonBinary] --> isAuthenticated: ", req.isAuthenticated());
+			console.log("[maxonBinary] --> req: ", req);
+			winston.verbose("[maxonBinary] --> /route1 reached via post");
+			res.sendStatus(200);
+		});
+		
+		winston.info('[maxonBinary] Maxon Binary routes added.');
+		callback(null, data);
+	};
+
+	// data <- (router: router, apiMiddleware, middleware, errorHandler)
+	MaxonBinary.initWriteRoutes = function(data, callback) {
+
+		var app = data.router;
+		var apiMiddleware = data.apiMiddleware;
+		var middleware = data.middleware;
+		var errorHandler = data.errorHandler;
+	
+		app.get('/routeWrite', apiMiddleware.requireUser, function(req, res) {
+			console.log("[maxonBinary] --> req.user.uid: ", req.user.uid);
+
+			if (req.user.uid !== undefined){
+				if (req.user.uid == 1){
+					winston.verbose("[maxonBinary] --> /routeWrite reached via post");
+					res.sendStatus(200);
+				}
+				else{
+					winston.verbose("[maxonBinary] --> invalid user");
+					res.sendStatus(404);
+				}
+			}
+		});
+	
+		callback(null, {
+			router: app
+		});
+
+	};
+
+}(module.exports));
