@@ -107,7 +107,7 @@
 				callback(new Error('Please log in.'));
 			}
 		});
-		// callback(null);
+		callback(null);
 	}
 
 	// data <- (router: pluginRouter, middleware, helpers)
