@@ -53,55 +53,64 @@
 				const binaryType = req.params.type;
 				const binaryFile = req.params.file;
 
-				// log the download start request
-				winston.verbose('[maxonBinary] --> User (' + uid + ') has requested ' + binaryFile + " [" + binaryType + "]");
-
 				// check passed type is among supported binary types
 				if (!Object.keys(constants.binaryLocations).includes(binaryType)){
 					winston.error('[maxonBinary] --> Binary type [' + binaryType + '] not supported.');
 					callback(new Error('Unexpected error. Please contact Backstage Community administrator.'));
-				}
+				} 
 
-				// retrieve the binary location for the given type
-				const binaryLocation = constants.binaryLocations[binaryType];
+				db.getObjectField('global', 'nextDownload', function (err, val) {
+					if (err) {
+						return callback(err);
+					}
 
-				// manage files being stored locally
-				if (binaryLocation === "local"){
-					// create file path for local files
-					const localFilePath = constants.home + constants.archive + '/' + binaryFile;
-					// check file existence
-					if (fs.existsSync(localFilePath)) {
+					// check value retrieved from DB
+					let nextDL = 1;
+					if (!Object.is(val,null)){
+						nextDL = val;
+					}
+					// log the download start request
+					winston.verbose('[maxonBinary] --> User (' + uid + ') has requested ' + binaryFile + " [" + binaryType + "]");
 
-						const currentDate = new Date();
-						const timestamp = currentDate.getTime();
+					// retrieve the binary location for the given type
+					const binaryLocation = constants.binaryLocations[binaryType];
 
-						User.setUserField(uid, 'last_download_file', binaryFile);
-						User.setUserField(uid, 'last_download_time', timestamp);
+					const currentDate = new Date();
+					const timestamp = currentDate.getTime();
 
-						db.getObjectField('global', 'nextDownload', function (err, val) {
-							if (err) {
-								return callback(err);
-							}
+					// manage files being stored locally
+					if (binaryLocation === "local"){
+						// create file path for local files
+						const localFilePath = constants.home + constants.archive + '/' + binaryFile;
+						// check file existence
+						if (fs.existsSync(localFilePath)) {
 
-							// check value retrieved from DB
-							let nextDL = 1;
-							if (!Object.is(val,null)){
-								nextDL = val;
-							}
+							User.setUserField(uid, 'last_download_file', binaryFile);
+							User.setUserField(uid, 'last_download_time', timestamp);
 
 							var data = {'uid': uid, 'file': binaryFile, 'timestamp': timestamp};
 							db.setObject('download:' + String(nextDL), data);
 							db.setObjectField('global', 'nextDownload', nextDL + 1);
+
 							res.status(200);
 							res.sendFile(localFilePath);
-						});
+
+						} else {
+							winston.error('[maxonBinary] --> User (' + uid + ') attempted to download ' + binaryFile + ' but file was not found.');
+							callback(new Error('File not found.'));
+						}
 					} else {
-						winston.error('[maxonBinary] --> User (' + uid + ') attempted to download ' + binaryFile + ' but file was not found.');
-						callback(new Error('File not found.'));
+
+						User.setUserField(uid, 'last_download_file', binaryFile);
+						User.setUserField(uid, 'last_download_time', timestamp);
+
+						var data = {'uid': uid, 'file': binaryFile, 'timestamp': timestamp};
+						db.setObject('download:' + String(nextDL), data);
+						db.setObjectField('global', 'nextDownload', nextDL + 1);
+
+						res.redirect(binaryLocation+binaryFile);
 					}
-				} else{
-					res.redirect(binaryLocation+binaryFile);
-				}
+				});
 			} else {
 				winston.error('[maxonBinary] --> Somebody attempted to download ' + binaryFile + ' without being logged in.');
 				callback(new Error('Please log in.'));
