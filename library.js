@@ -1,10 +1,4 @@
 'use strict';
-(function(routes) {
-
-
-
-}(module.exports));
-
 
 (function (MaxonBinary) {
 
@@ -19,19 +13,23 @@
 
 	const constants = Object.freeze({
 		archive: nconf.get('maxon_binary:archive_path'),
-		home: nconf.get('maxon_binary:home_path')
+		home: nconf.get('maxon_binary:home_path'),
+		binaryLocations: nconf.get('maxon_binary:binary_locations')
 	});
 
 	// check the contants object for contain data
 	let configOk = false;
 	if (!constants.home) {
-		winston.error('[maxonBinary] --> Home folder of the user starting nodebb not found.');
+		winston.error("[maxonBinary] --> NodeBB owner's home not set.");
 	} else if (!constants.archive) {
-		winston.error('[maxonBinary] --> Archive folder containing binaries not found.');
+		winston.error('[maxonBinary] --> Binary local folder not set.');
+	} else if (!constants.binaryLocations) {
+		winston.error('[maxonBinary] --> Binary locations not set.');
 	} else {
 		configOk = true;
 		winston.info('[maxonBinary] --> Config is OK');
 	}
+
 
 	// data <- (app: app, router: params.router, middleware: middleware, controllers: controllers)
 	MaxonBinary.retrieveBinary = function(data, callback) {
@@ -43,60 +41,77 @@
 		let middleware = data.middleware;
 		let controllers = data.controllers;
 
-		// console.log ("app: ", app);
-		// console.log ("router: ", router);
-		// console.log ("middleware: ", middleware);
-		// console.log ("controllers: ", controllers);
+		console.log("constants: ", constants);
 
-		app.get('/api' + constants.archive + '/:file(*?)', function (req, res, callback) {
+		app.get('/api' + constants.archive + '/:type/:file(*?)', middleware.authenticate, middleware.validateAuth, function (req, res, callback) {
 			loggedIn = req.loggedIn;
+
 			// check the user to be logged in
 			if (loggedIn)
 			{
-				uid = req.user.uid;
-				winston.verbose('[maxonBinary] --> User (' + req.user.uid + ') is downloading ' + req.params.file);
-				// build absolute path to the file to get
-				let filepath = constants.home + constants.archive + '/' + req.params.file;
-				// check file existence
-				if (fs.existsSync(filepath)) {
+				const uid = req.user.uid;
+				const binaryType = req.params.type;
+				const binaryFile = req.params.file;
 
-					let currentDate = new Date();
-					let timestamp = currentDate.getTime();
+				// log the download start request
+				winston.verbose('[maxonBinary] --> User (' + uid + ') has requested ' + binaryFile + " [" + binaryType + "]");
 
-					User.setUserField(uid, 'last_download_file', req.params.file);
-					User.setUserField(uid, 'last_download_time', timestamp);
+				// check passed type is among supported binary types
+				if (!Object.keys(constants.binaryLocations).includes(binaryType)){
+					winston.error('[maxonBinary] --> Binary type [' + binaryType + '] not supported.');
+					callback(new Error('Unexpected error. Please contact Backstage Community administrator.'));
+				}
 
-					db.getObjectField('global', 'nextDownload', function (err, val) {
-						if (err) {
-							return callback(err);
-						}
+				// retrieve the binary location for the given type
+				const binaryLocation = constants.binaryLocations[binaryType];
 
-						// check value retrieved from DB
-						let nextDL = 1;
-						if (!Object.is(val,null)){
-							nextDL = val;
-						}
+				// manage files being stored locally
+				if (binaryLocation === "local"){
+					// create file path for local files
+					const localFilePath = constants.home + constants.archive + '/' + binaryFile;
+					// check file existence
+					if (fs.existsSync(localFilePath)) {
 
-						var data = {'uid': uid, 'file': req.params.file, 'timestamp': timestamp};
-						db.setObject('download:' + String(nextDL), data);
-						db.setObjectField('global', 'nextDownload', nextDL + 1);
-						res.status(200);
-						res.sendFile(filepath);
-					});
-				} else {
-					winston.error('[maxonBinary] --> User (' + req.user.uid + ') attempted to download ' + req.params.file + ' but file was not found.');
-					callback(new Error('File not found.'));
+						const currentDate = new Date();
+						const timestamp = currentDate.getTime();
+
+						User.setUserField(uid, 'last_download_file', binaryFile);
+						User.setUserField(uid, 'last_download_time', timestamp);
+
+						db.getObjectField('global', 'nextDownload', function (err, val) {
+							if (err) {
+								return callback(err);
+							}
+
+							// check value retrieved from DB
+							let nextDL = 1;
+							if (!Object.is(val,null)){
+								nextDL = val;
+							}
+
+							var data = {'uid': uid, 'file': binaryFile, 'timestamp': timestamp};
+							db.setObject('download:' + String(nextDL), data);
+							db.setObjectField('global', 'nextDownload', nextDL + 1);
+							res.status(200);
+							res.sendFile(localFilePath);
+						});
+					} else {
+						winston.error('[maxonBinary] --> User (' + uid + ') attempted to download ' + binaryFile + ' but file was not found.');
+						callback(new Error('File not found.'));
+					}
+				} else{
+					res.redirect(binaryLocation+binaryFile);
 				}
 			} else {
-				winston.error('[maxonBinary] --> Somebody attempted to download ' + req.params.file + ' without being logged in.');
+				winston.error('[maxonBinary] --> Somebody attempted to download ' + binaryFile + ' without being logged in.');
 				callback(new Error('Please log in.'));
 			}
 		});
-		callback(null);
+		// callback(null);
 	}
 
 	// data <- (router: pluginRouter, middleware, helpers)
-	MaxonBinary.initRoutes = function(data, callback) {
+	MaxonBinary.initV3Routes = function(data, callback) {
 
 		let router = data.router;
 		let middleware = data.middleware;
@@ -106,26 +121,34 @@
 		// console.log ("middleware: ", middleware);
 		// console.log ("helpers: ", helpers);
 
-		router.get('/route0', function(req, res) {
-			console.log("[maxonBinary] --> isAuthenticated: ", req.isAuthenticated());
-			// console.log("[maxonBinary] --> req: ", req);
-			winston.verbose("[maxonBinary] --> /route0 reached via get");
-			res.sendStatus(200);
+		router.get('/route0', middleware.authenticate, function(req, res) {
+			if (req.user.uid !== undefined){
+				winston.verbose("[maxonBinary] --> /route0 reached via get by user: " + req.user.uid);
+				res.sendStatus(200);
+			}
+			else{
+				winston.verbose("[maxonBinary] --> req.user.uid is undefined");
+				res.sendStatus(404);
+			}
 		});
 
-		router.post('/route1', function(req, res) {
-			console.log("[maxonBinary] --> isAuthenticated: ", req.isAuthenticated());
-			console.log("[maxonBinary] --> req: ", req);
-			winston.verbose("[maxonBinary] --> /route1 reached via post");
-			res.sendStatus(200);
+		router.post('/route1', middleware.authenticate, function(req, res) {
+			if (req.user.uid !== undefined){
+				winston.verbose("[maxonBinary] --> /route1 reached via post by user: " + req.user.uid);
+				res.sendStatus(200);
+			}
+			else{
+				winston.verbose("[maxonBinary] --> req.user.uid is undefined");
+				res.sendStatus(404);
+			}
 		});
 		
 		winston.info('[maxonBinary] Maxon Binary routes added.');
 		callback(null, data);
 	};
 
-	// data <- (router: router, apiMiddleware, middleware, errorHandler)
-	MaxonBinary.initWriteRoutes = function(data, callback) {
+	// deprecated
+	MaxonBinary.initV1V2Routes = function(data, callback) {
 
 		var app = data.router;
 		var apiMiddleware = data.apiMiddleware;
@@ -137,7 +160,7 @@
 
 			if (req.user.uid !== undefined){
 				if (req.user.uid == 1){
-					winston.verbose("[maxonBinary] --> /routeWrite reached via post");
+					winston.verbose("[maxonBinary] --> /routeWrite reached via get");
 					res.sendStatus(200);
 				}
 				else{
