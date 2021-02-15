@@ -6,7 +6,6 @@
 	"library": "./library.js",
 	"hooks": [
 		{ "hook": "static:app.load", "method": "retrieveBinary" },
-		{ "hook": "static:api.routes", "method": "initV3Routes" },
-    { "hook": "filter:plugin.write-api.routes", "method": "initV1V2Routes" }
+		{ "hook": "static:api.routes", "method": "customAPIRoutes" }
 	]
 }
