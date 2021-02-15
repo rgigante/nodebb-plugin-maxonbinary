@@ -319,7 +319,6 @@ function isValidDate(d) {
 						if (err) {
 							return callback(err);
 						}
-						console.log(downloadEntries);
 						if (uid > 0){
 							user.getUserField(uid, 'last_download_file', function (err, last_download_file) {
 								if (err) {
