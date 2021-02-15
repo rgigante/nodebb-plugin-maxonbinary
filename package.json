@@ -1,6 +1,6 @@
 {
   "name": "nodebb-plugin-maxonbinary",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Maxon Binaries plugin",
   "main": "library.js",
   "repository": {
@@ -10,11 +10,11 @@
   "keywords": [
     "nodebb",
     "plugin",
-    "binary"
+    "maxonbinary"
   ],
   "author": {
     "name": "Riccardo Gigante",
-    "email": "r_gigante@maxon.net"
+    "email": "sdk_support@maxon.net"
   },
   "license": "MIT",
   "bugs": {
