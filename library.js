@@ -108,17 +108,13 @@ function isValidDate(d) {
 	const debugOutput = false;
 	
 	const constants = Object.freeze({
-		archive: nconf.get('maxon_binary:archive_path'),
-		home: nconf.get('maxon_binary:home_path'),
+		upload_fullpath: nconf.get('upload_path'),
 		binaryLocations: nconf.get('maxon_binary:binary_locations')
 	});
-
 	// check the contants object for contain data
 	let configOk = false;
-	if (!constants.home) {
-		winston.error("[maxonBinary] NodeBB owner's home not set.");
-	} else if (!constants.archive) {
-		winston.error('[maxonBinary] Binary local folder not set.');
+	if (!constants.upload_fullpath) {
+		winston.error('[maxonBinary] Upload full path not set.');
 	} else if (!constants.binaryLocations) {
 		winston.error('[maxonBinary] Binary locations not set.');
 	} else {
@@ -130,6 +126,9 @@ function isValidDate(d) {
 		winston.verbose('[maxonBinary] Configuration');
 		console.log(constants);
 	}
+
+	// set upload_route given the upload_fullpath
+	const upload_route = constants.upload_fullpath.substr(constants.upload_fullpath.lastIndexOf('/'));
 
 	// DB counter for Maxon Binary downloads
 	const nextMaxonBinaryDownloadField = 'nextMaxonBinaryDownload';
@@ -146,14 +145,13 @@ function isValidDate(d) {
 		let middleware = data.middleware;
 		let controllers = data.controllers;
 
-		app.get('/api' + constants.archive + '/:type/:file(*?)', middleware.authenticate, middleware.validateAuth, function (req, res, callback) {
+		app.get('/api' + upload_route + '/:type/:file(*?)', middleware.authenticate, middleware.validateAuth, function (req, res, callback) {
 			loggedIn = req.loggedIn;
-
 			// check the user to be logged in
 			if (loggedIn)
 			{
 				const uid = req.user.uid;
-				const binaryType = req.params.type;
+				const binaryType = req.params.type; // TODO specify also files
 				const binaryFile = req.params.file;
 
 				// check passed type is among supported binary types
@@ -190,9 +188,11 @@ function isValidDate(d) {
 					const timestamp = currentDate.getTime();
 
 					// manage files being stored locally
-					if (binaryLocation === "local"){
+					if (binaryLocation.search('/') === 0){
 						// create file path for local files
-						const localFilePath = constants.home + constants.archive + '/' + binaryFile;
+						const localFilePath = constants.upload_fullpath + binaryLocation + "/" + binaryFile;
+
+						console.log(localFilePath);
 						// check file existence
 						if (fs.existsSync(localFilePath)) {
 
@@ -223,7 +223,7 @@ function isValidDate(d) {
 							callback(new Error('File not found.'));
 						}
 					}
-					else {
+					else{
 						// update last_download_file and last_download_time fields
 						user.setUserField(uid, 'last_download_file', binaryFile);
 						user.setUserField(uid, 'last_download_time', timestamp);
