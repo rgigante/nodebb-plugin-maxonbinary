@@ -101,6 +101,8 @@ function isValidDate(d) {
 	// const groups = require.main.require('./src/groups');
 	const db = require.main.require('./src/database');
 
+	const azureStorage = require('azure-storage');
+
 	const nconf = module.parent.require('nconf');
 	const winston = module.parent.require('winston');
 
@@ -109,7 +111,8 @@ function isValidDate(d) {
 	
 	const constants = Object.freeze({
 		upload_fullpath: nconf.get('upload_path'),
-		binaryLocations: nconf.get('maxon_binary:binary_locations')
+		binaryLocations: nconf.get('maxon_binary:binary_locations'),
+		azureCredentials: nconf.get('maxon_binary:azure_credentials')
 	});
 	// check the contants object for contain data
 	let configOk = false;
@@ -117,6 +120,8 @@ function isValidDate(d) {
 		winston.error('[maxonBinary] Upload full path not set.');
 	} else if (!constants.binaryLocations) {
 		winston.error('[maxonBinary] Binary locations not set.');
+	} else if (!constants.azureCredentials) {
+		winston.error('[maxonBinary] Azure Storage Blob credentials not set.');
 	} else {
 		configOk = true;
 		winston.info('[maxonBinary] Config is OK');
@@ -222,6 +227,66 @@ function isValidDate(d) {
 							winston.error('[maxonBinary] User (' + uid + ') attempted to download ' + binaryFile + ' but file was not found.');
 							callback(new Error('File not found.'));
 						}
+					}
+					else if (binaryLocation.search('azure') === 0){
+						console.log("AZURE START");
+
+						// update last_download_file and last_download_time fields
+						user.setUserField(uid, 'last_download_file', binaryFile);
+						user.setUserField(uid, 'last_download_time', timestamp);
+
+						console.log('uid: ', uid, '\nfilename: ', binaryFile, '\nbinarylocation: ', binaryLocation, '\nbinarytype: ', binaryType, '\ntimestamp: ', timestamp);
+
+							// prepare data blob for log download request
+						var data = {
+							'uid': uid,
+							'filename': binaryFile,
+							'binarylocation':binaryLocation,
+							'binarytype':binaryType,
+							'timestamp': timestamp
+						};
+
+						// write data blob to DB and increment binary download counter
+						db.setObject(binaryDownloadKey + ':' + String(nextDL), data);
+						db.incrObjectField('global', nextMaxonBinaryDownloadField);
+
+						// set container name
+						const containerName = binaryLocation.substring(binaryLocation.search('/')+1);
+						// set the blob name
+						const blobName = binaryFile;
+
+						// enter your storage account name and shared key
+						const account = constants.azureCredentials.storage_name;
+						const accountKey = constants.azureCredentials.storage_key;
+
+						console.log ("containerName: ", containerName, "\nblobName: ", blobName, "\naccount: ", account, "\naccountKey: ", accountKey);
+
+						// create blob service given Azure credentials
+						const blobService = azureStorage.createBlobService(account, accountKey);
+
+						// define shared policies
+						const startDate = new Date();
+						const expiryDate = new Date(startDate);
+						expiryDate.setMinutes(startDate.getMinutes() + 1);
+						startDate.setMinutes(startDate.getMinutes() - 1);
+						const sharedAccessPolicy = {
+								AccessPolicy: {
+										Permissions: azureStorage.BlobUtilities.SharedAccessPermissions.READ,
+										Start: startDate,
+										Expiry: expiryDate
+								}
+						};
+						
+						// generate SAS token
+						const token = blobService.generateSharedAccessSignature(containerName, blobName, sharedAccessPolicy);
+
+						// prepare expiring URL
+						const azureExpiringURL = blobService.getUrl(containerName, blobName, token);
+						// redirect to proper destination
+						console.log("azureExpiringURL: ",azureExpiringURL);
+						// res.redirect(azureExpiringURL);
+						console.log("AZURE END");
+						res.redirect(azureExpiringURL);
 					}
 					else{
 						// update last_download_file and last_download_time fields
