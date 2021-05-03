@@ -5,7 +5,13 @@
 	"url": "https://github.com/rgigante/nodebb-plugin-maxonbinary",
 	"library": "./library.js",
 	"hooks": [
-		{ "hook": "static:app.load", "method": "retrieveBinary" },
-		{ "hook": "static:api.routes", "method": "customAPIRoutes" }
+		{ 
+			"hook": "static:app.load", 
+			"method": "routesOnLoad" 
+		},
+		{ 
+			"hook": "static:api.routes", 
+			"method": "customAPIRoutes" 
+		}
 	]
 }

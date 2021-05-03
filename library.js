@@ -141,7 +141,8 @@ function isValidDate(d) {
 	const binaryDownloadKey = 'maxonbinary-download';
 
 	// Method responsible to check user authentication and deliver Maxon binaries based on actual location
-	MaxonBinary.retrieveBinary = function(data, callback) {
+	// Method responsible to re-route non authenticated user to landing
+	MaxonBinary.routesOnLoad = function(data, callback) {
 		let loggedIn = false;
 		let uid = -1;
 		
@@ -149,6 +150,13 @@ function isValidDate(d) {
 		let router = data.router;
 		let middleware = data.middleware;
 		let controllers = data.controllers;
+
+		// re-route non authenticated users to landing
+		app.get('/', function (req, res) {
+			// check the user to be logged in
+			if (req.loggedIn) res.redirect('/categories');
+			else res.redirect('/landing');
+		});
 
 		app.get('/api' + upload_route + '/:type/:file(*?)', middleware.authenticate, middleware.validateAuth, function (req, res, callback) {
 			loggedIn = req.loggedIn;
