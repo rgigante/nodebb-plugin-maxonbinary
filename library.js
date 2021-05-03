@@ -237,13 +237,12 @@ function isValidDate(d) {
 						}
 					}
 					else if (binaryLocation.search('azure') === 0){
-						console.log("AZURE START");
 
 						// update last_download_file and last_download_time fields
 						user.setUserField(uid, 'last_download_file', binaryFile);
 						user.setUserField(uid, 'last_download_time', timestamp);
 
-						console.log('uid: ', uid, '\nfilename: ', binaryFile, '\nbinarylocation: ', binaryLocation, '\nbinarytype: ', binaryType, '\ntimestamp: ', timestamp);
+						// console.log('uid: ', uid, '\nfilename: ', binaryFile, '\nbinarylocation: ', binaryLocation, '\nbinarytype: ', binaryType, '\ntimestamp: ', timestamp);
 
 							// prepare data blob for log download request
 						var data = {
@@ -267,7 +266,7 @@ function isValidDate(d) {
 						const account = constants.azureCredentials.storage_name;
 						const accountKey = constants.azureCredentials.storage_key;
 
-						console.log ("containerName: ", containerName, "\nblobName: ", blobName, "\naccount: ", account, "\naccountKey: ", accountKey);
+						// console.log ("containerName: ", containerName, "\nblobName: ", blobName, "\naccount: ", account, "\naccountKey: ", accountKey);
 
 						// create blob service given Azure credentials
 						const blobService = azureStorage.createBlobService(account, accountKey);
@@ -291,9 +290,7 @@ function isValidDate(d) {
 						// prepare expiring URL
 						const azureExpiringURL = blobService.getUrl(containerName, blobName, token);
 						// redirect to proper destination
-						console.log("azureExpiringURL: ",azureExpiringURL);
-						// res.redirect(azureExpiringURL);
-						console.log("AZURE END");
+						// console.log("azureExpiringURL: ",azureExpiringURL);
 						res.redirect(azureExpiringURL);
 					}
 					else{
