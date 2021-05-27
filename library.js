@@ -112,7 +112,8 @@ function isValidDate(d) {
 	const constants = Object.freeze({
 		upload_fullpath: nconf.get('upload_path'),
 		binaryLocations: nconf.get('maxon_binary:binary_locations'),
-		azureCredentials: nconf.get('maxon_binary:azure_credentials')
+		azureCredentials: nconf.get('maxon_binary:azure_credentials'),
+		rateMBs: parseFloat(nconf.get('maxon_binary:rateMBs'))
 	});
 	// check the contants object for contain data
 	let configOk = false;
@@ -122,6 +123,8 @@ function isValidDate(d) {
 		winston.error('[maxonBinary] Binary locations not set.');
 	} else if (!constants.azureCredentials) {
 		winston.error('[maxonBinary] Azure Storage Blob credentials not set.');
+	} else if (!constants.rateMBs) {
+		winston.error('[maxonBinary] Download rate threshold not set.');
 	} else {
 		configOk = true;
 		winston.info('[maxonBinary] Config is OK');
@@ -270,28 +273,36 @@ function isValidDate(d) {
 
 						// create blob service given Azure credentials
 						const blobService = azureStorage.createBlobService(account, accountKey);
-
-						// define shared policies
-						const startDate = new Date();
-						const expiryDate = new Date(startDate);
-						expiryDate.setMinutes(startDate.getMinutes() + 1);
-						startDate.setMinutes(startDate.getMinutes() - 1);
-						const sharedAccessPolicy = {
-								AccessPolicy: {
-										Permissions: azureStorage.BlobUtilities.SharedAccessPermissions.READ,
-										Start: startDate,
-										Expiry: expiryDate
-								}
-						};
 						
-						// generate SAS token
-						const token = blobService.generateSharedAccessSignature(containerName, blobName, sharedAccessPolicy);
+						// get the blob properties
+						blobService.getBlobProperties(containerName, blobName, function (error, blobProperties) {
+							const blobSizeMB = blobProperties.contentLength * 0.000001
+							const estimatedDownloadDuration = blobSizeMB / constants.rateMBs;
+							// console.log ("constants.rateMBs", constants.rateMBs);
+							// console.log ("blobSize (MB)  ", blobSizeMB, "estimatedDownloadDuration (s): ", estimatedDownloadDuration);
 
-						// prepare expiring URL
-						const azureExpiringURL = blobService.getUrl(containerName, blobName, token);
-						// redirect to proper destination
-						// console.log("azureExpiringURL: ",azureExpiringURL);
-						res.redirect(azureExpiringURL);
+							// define shared policies
+							const startDate = new Date();
+							const expiryDate = new Date(startDate);
+							expiryDate.setSeconds(startDate.getSeconds() + estimatedDownloadDuration);
+							startDate.setSeconds(startDate.getSeconds() - 1);
+							const sharedAccessPolicy = {
+									AccessPolicy: {
+											Permissions: azureStorage.BlobUtilities.SharedAccessPermissions.READ,
+											Start: startDate,
+											Expiry: expiryDate
+									}
+							};
+							
+							// generate SAS token
+							const token = blobService.generateSharedAccessSignature(containerName, blobName, sharedAccessPolicy);
+
+							// prepare expiring URL
+							const azureExpiringURL = blobService.getUrl(containerName, blobName, token);
+							// redirect to proper destination
+							// console.log("azureExpiringURL: ",azureExpiringURL);
+							res.redirect(azureExpiringURL);
+						});
 					}
 					else{
 						// update last_download_file and last_download_time fields
