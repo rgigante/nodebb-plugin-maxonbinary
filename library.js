@@ -1,93 +1,68 @@
 'use strict';
 
 // Filter download log entries by uid, from/to timestamps, binary types
-function filterDownloadData (sourceData, uid, fromTS, toTS, binaryType){
-	let retVal = [];
-	for (const i in sourceData){
-		const entry = sourceData[i];
-		if (uid > 0){
-			if (fromTS > 0.0){
-				if (toTS > 0.0){
-					if (binaryType !== ""){
+function FilterDownloadData(sourceData, uid, fromTS, toTS, binaryType) {
+	const retVal = [];
+	for (const i in sourceData) {
+		if (sourceData.hasOwnProperty(i)) {
+			const entry = sourceData[i];
+			if (uid > 0) {
+				if (fromTS > 0.0) {
+					if (toTS > 0.0) {
+						if (binaryType !== '') {
+							if (entry.binarytype === binaryType &&
+								entry.timestamp >= fromTS &&
+								entry.timestamp <= toTS &&
+								entry.uid === uid) retVal.push(entry);
+						} else if (entry.timestamp >= fromTS &&
+								entry.timestamp <= toTS &&
+								entry.uid === uid) retVal.push(entry);
+					} else if (binaryType !== '') {
 						if (entry.binarytype === binaryType &&
-							entry.timestamp >= fromTS &&
-							entry.timestamp <= toTS &&
-							entry.uid === uid)
-							retVal.push(entry);
-					}
-					else{
-						if (entry.timestamp >= fromTS &&
-							entry.timestamp <= toTS &&
-							entry.uid === uid)
-							retVal.push(entry);
-					}
-				}
-				else{
-					if (binaryType !== ""){
-						if (entry.binarytype === binaryType &&
-							entry.timestamp >= fromTS &&
-							entry.uid === uid)
-							retVal.push(entry);
-					}
-					else {
-						if (entry.timestamp >= fromTS &&
-							entry.uid === uid)
-							retVal.push(entry);
-					}
-				}
-			}
-			else{
-				if (binaryType !== ""){
+								entry.timestamp >= fromTS &&
+								entry.uid === uid) retVal.push(entry);
+					} else if (entry.timestamp >= fromTS &&
+								entry.uid === uid) retVal.push(entry);
+				} else if (binaryType !== '') {
 					if (entry.binarytype === binaryType &&
-						entry.uid === uid)
-						retVal.push(entry);
-				}
-				else {
-					if (entry.uid === uid)
-						retVal.push(entry);
-				}
-			}
-		}
-		else{
-			if (fromTS > 0.0){
-				if (toTS > 0.0){
-					if (binaryType !== ""){
+							entry.uid === uid) retVal.push(entry);
+				} else if (entry.uid === uid) retVal.push(entry);
+			} else if (fromTS > 0.0) {
+				if (toTS > 0.0) {
+					if (binaryType !== '') {
 						if (entry.binarytype === binaryType &&
-							entry.timestamp >= fromTS &&
-							entry.timestamp <= toTS)
-							retVal.push(entry);
-					}
-					else{
-						if (entry.timestamp >= fromTS &&
-							entry.timestamp <= toTS)
-							retVal.push(entry);
-					}
-				}
-				else{
-					if (binaryType !== ""){
-						if (entry.binarytype === binaryType &&
-							entry.timestamp >= fromTS)
-							retVal.push(entry);
-					}
-					else {
-						if (entry.timestamp >= fromTS)
-							retVal.push(entry);
-					}
-				}
-			}
-			else{
-				if (binaryType !== ""){
-					if (entry.binarytype === binaryType)
-						retVal.push(entry);
-				}
-				else {
-						retVal.push(entry);
-				}
+								entry.timestamp >= fromTS &&
+								entry.timestamp <= toTS) retVal.push(entry);
+					} else if (entry.timestamp >= fromTS &&
+								entry.timestamp <= toTS) retVal.push(entry);
+				} else if (binaryType !== '') {
+					if (entry.binarytype === binaryType &&
+								entry.timestamp >= fromTS) retVal.push(entry);
+				} else if (entry.timestamp >= fromTS) retVal.push(entry);
+			} else if (binaryType !== '') {
+				if (entry.binarytype === binaryType) retVal.push(entry);
+			} else {
+				retVal.push(entry);
 			}
 		}
 	}
 	return retVal;
-};
+}
+
+function LogDownloadData(db, uid, binaryFile, binaryLocation, binaryType, timestamp, binaryDownloadKey, nextDL, nextMaxonBinaryDownloadField) {
+	// prepare data blob for log download request
+	var data = {
+		uid: uid,
+		filename: binaryFile,
+		binarylocation: binaryLocation,
+		binarytype: binaryType,
+		timestamp: timestamp,
+	};
+
+	// write data blob to DB and increment binary download counter
+	db.setObject(binaryDownloadKey + ':' + String(nextDL), data);
+	db.incrObjectField('global', nextMaxonBinaryDownloadField);
+}
 
 // Validate Date object
 function isValidDate(d) {
@@ -95,8 +70,7 @@ function isValidDate(d) {
 }
 
 (function (MaxonBinary) {
-
-	const fs = module.require('fs'); 
+	const fs = module.require('fs');
 	const user = require.main.require('./src/user');
 	// const groups = require.main.require('./src/groups');
 	const db = require.main.require('./src/database');
@@ -108,15 +82,15 @@ function isValidDate(d) {
 
 	// activate debug output
 	const debugOutput = false;
-	
+
 	const constants = Object.freeze({
 		upload_fullpath: nconf.get('upload_path'),
 		binaryLocations: nconf.get('maxon_binary:binary_locations'),
 		azureCredentials: nconf.get('maxon_binary:azure_credentials'),
-		rateMBs: parseFloat(nconf.get('maxon_binary:rateMBs'))
+		rateMBs: parseFloat(nconf.get('maxon_binary:rateMBs')),
 	});
 	// check the contants object for contain data
-	let configOk = false;
+	// let configOk = false;
 	if (!constants.upload_fullpath) {
 		winston.error('[maxonBinary] Upload full path not set.');
 	} else if (!constants.binaryLocations) {
@@ -126,7 +100,7 @@ function isValidDate(d) {
 	} else if (!constants.rateMBs) {
 		winston.error('[maxonBinary] Download rate threshold not set.');
 	} else {
-		configOk = true;
+		// configOk = true;
 		winston.info('[maxonBinary] Config is OK');
 	}
 
@@ -145,14 +119,9 @@ function isValidDate(d) {
 
 	// Method responsible to check user authentication and deliver Maxon binaries based on actual location
 	// Method responsible to re-route non authenticated user to landing
-	MaxonBinary.routesOnLoad = function(data, callback) {
-		let loggedIn = false;
-		let uid = -1;
-		
-		let app = data.app;
-		let router = data.router;
-		let middleware = data.middleware;
-		let controllers = data.controllers;
+	MaxonBinary.routesOnLoad = function (data, callback) {
+		const app = data.app;
+		const middleware = data.middleware;
 
 		// re-route non authenticated users to landing
 		app.get('/', function (req, res) {
@@ -162,19 +131,17 @@ function isValidDate(d) {
 		});
 
 		app.get('/api' + upload_route + '/:type/:file(*?)', middleware.authenticate, middleware.validateAuth, function (req, res, callback) {
-			loggedIn = req.loggedIn;
+			const binaryType = req.params.type; // TODO specify also files
+			const binaryFile = req.params.file;
 			// check the user to be logged in
-			if (loggedIn)
-			{
+			if (req.loggedIn) {
 				const uid = req.user.uid;
-				const binaryType = req.params.type; // TODO specify also files
-				const binaryFile = req.params.file;
 
 				// check passed type is among supported binary types
-				if (!Object.keys(constants.binaryLocations).includes(binaryType)){
+				if (!Object.keys(constants.binaryLocations).includes(binaryType)) {
 					winston.error('[maxonBinary] Binary type [' + binaryType + '] not supported.');
 					callback(new Error('Unexpected error. Please contact Backstage Community administrator.'));
-				} 
+				}
 
 				// retrieve next download value retrieved from DB
 				db.getObjectField('global', nextMaxonBinaryDownloadField, function (err, nextDLValue) {
@@ -185,16 +152,15 @@ function isValidDate(d) {
 					// check retrieved value from DB and if invalid initialize field
 					let nextDL = 1;
 					//
-					if (!Object.is(nextDLValue,null)){
+					if (!Object.is(nextDLValue, null)) {
 						nextDL = nextDLValue;
-					}
-					else{
+					} else {
 						db.setObjectField('global', nextMaxonBinaryDownloadField, nextDL);
 					}
 
 					// log the download start request
 					if (debugOutput) {
-						winston.verbose('[maxonBinary] User (' + uid + ') has requested ' + binaryFile + " [" + binaryType + "]");
+						winston.verbose('[maxonBinary] User (' + uid + ') has requested ' + binaryFile + ' [' + binaryType + ']');
 					}
 
 					// retrieve the binary location for the given type
@@ -204,64 +170,35 @@ function isValidDate(d) {
 					const timestamp = currentDate.getTime();
 
 					// manage files being stored locally
-					if (binaryLocation.search('/') === 0){
+					if (binaryLocation.search('/') === 0) {
 						// create file path for local files
-						const localFilePath = constants.upload_fullpath + binaryLocation + "/" + binaryFile;
+						const localFilePath = constants.upload_fullpath + binaryLocation + '/' + binaryFile;
 
 						console.log(localFilePath);
 						// check file existence
 						if (fs.existsSync(localFilePath)) {
-
 							// update last_download_file and last_download_time fields
 							user.setUserField(uid, 'last_download_file', binaryFile);
 							user.setUserField(uid, 'last_download_time', timestamp);
 
-							// prepare data blob for log download request
-							var data = {
-								'uid': uid,
-								'filename': binaryFile,
-								'binarylocation':binaryLocation,
-								'binarytype':binaryType,
-								'timestamp': timestamp
-							};
-							
-							// write data blob to DB and increment binary download counter
-							db.setObject(binaryDownloadKey + ':' + String(nextDL), data);
-							db.incrObjectField('global', nextMaxonBinaryDownloadField);
+							LogDownloadData(db, uid, binaryFile, binaryLocation, binaryType, timestamp, binaryDownloadKey, nextDL, nextMaxonBinaryDownloadField);
 
 							// return result
 							res.status(200);
 							res.sendFile(localFilePath);
-
-						}
-						else {
+						} else {
 							winston.error('[maxonBinary] User (' + uid + ') attempted to download ' + binaryFile + ' but file was not found.');
 							callback(new Error('File not found.'));
 						}
-					}
-					else if (binaryLocation.search('azure') === 0){
-
+					} else if (binaryLocation.search('azure') === 0) {
 						// update last_download_file and last_download_time fields
 						user.setUserField(uid, 'last_download_file', binaryFile);
 						user.setUserField(uid, 'last_download_time', timestamp);
 
-						// console.log('uid: ', uid, '\nfilename: ', binaryFile, '\nbinarylocation: ', binaryLocation, '\nbinarytype: ', binaryType, '\ntimestamp: ', timestamp);
-
-							// prepare data blob for log download request
-						var data = {
-							'uid': uid,
-							'filename': binaryFile,
-							'binarylocation':binaryLocation,
-							'binarytype':binaryType,
-							'timestamp': timestamp
-						};
-
-						// write data blob to DB and increment binary download counter
-						db.setObject(binaryDownloadKey + ':' + String(nextDL), data);
-						db.incrObjectField('global', nextMaxonBinaryDownloadField);
+						LogDownloadData(db, uid, binaryFile, binaryLocation, binaryType, timestamp, binaryDownloadKey, nextDL, nextMaxonBinaryDownloadField);
 
 						// set container name
-						const containerName = binaryLocation.substring(binaryLocation.search('/')+1);
+						const containerName = binaryLocation.substring(binaryLocation.search('/') + 1);
 						// set the blob name
 						const blobName = binaryFile;
 
@@ -273,13 +210,17 @@ function isValidDate(d) {
 
 						// create blob service given Azure credentials
 						const blobService = azureStorage.createBlobService(account, accountKey);
-						
+
 						// get the blob properties
-						blobService.getBlobProperties(containerName, blobName, function (error, blobProperties) {
-							const blobSizeMB = blobProperties.contentLength * 0.000001
-							const estimatedDownloadDuration = blobSizeMB / constants.rateMBs;
+						blobService.getBlobProperties(containerName, blobName, function (err, blobProperties) {
+							if (err) {
+								return callback(err);
+							}
+							const blobSizeMB = blobProperties.contentLength * 0.000001;
+							let estimatedDownloadDuration = blobSizeMB / constants.rateMBs;
 							// console.log ("constants.rateMBs", constants.rateMBs);
 							// console.log ("blobSize (MB)  ", blobSizeMB, "estimatedDownloadDuration (s): ", estimatedDownloadDuration);
+							if (estimatedDownloadDuration < 5) estimatedDownloadDuration = 5;
 
 							// define shared policies
 							const startDate = new Date();
@@ -287,13 +228,13 @@ function isValidDate(d) {
 							expiryDate.setSeconds(startDate.getSeconds() + estimatedDownloadDuration);
 							startDate.setSeconds(startDate.getSeconds() - 1);
 							const sharedAccessPolicy = {
-									AccessPolicy: {
-											Permissions: azureStorage.BlobUtilities.SharedAccessPermissions.READ,
-											Start: startDate,
-											Expiry: expiryDate
-									}
+								AccessPolicy: {
+									Permissions: azureStorage.BlobUtilities.SharedAccessPermissions.READ,
+									Start: startDate,
+									Expiry: expiryDate,
+								},
 							};
-							
+
 							// generate SAS token
 							const token = blobService.generateSharedAccessSignature(containerName, blobName, sharedAccessPolicy);
 
@@ -303,52 +244,38 @@ function isValidDate(d) {
 							// console.log("azureExpiringURL: ",azureExpiringURL);
 							res.redirect(azureExpiringURL);
 						});
-					}
-					else{
+					} else {
 						// update last_download_file and last_download_time fields
 						user.setUserField(uid, 'last_download_file', binaryFile);
 						user.setUserField(uid, 'last_download_time', timestamp);
 
-							// prepare data blob for log download request
-						var data = {
-							'uid': uid,
-							'filename': binaryFile,
-							'binarylocation':binaryLocation,
-							'binarytype':binaryType,
-							'timestamp': timestamp
-						};
-
-						// write data blob to DB and increment binary download counter
-						db.setObject(binaryDownloadKey + ':' + String(nextDL), data);
-						db.incrObjectField('global', nextMaxonBinaryDownloadField);
+						LogDownloadData(db, uid, binaryFile, binaryLocation, binaryType, timestamp, binaryDownloadKey, nextDL, nextMaxonBinaryDownloadField);
 
 						// redirect to proper destination
-						res.redirect(binaryLocation+binaryFile);
+						res.redirect(binaryLocation + binaryFile);
 					}
 				});
-			}
-			else {
+			} else {
 				winston.error('[maxonBinary] Unexpected attempt to download ' + binaryFile + ' without being authentication.');
 				callback(new Error('Please log in.'));
 			}
 		});
 		callback(null);
-	}
+	};
 
 	// Method responsible to reply to requests coming from MaxonBinary custom routes
-	MaxonBinary.customAPIRoutes = function(data, callback) {
-
-		let router = data.router;
-		let middleware = data.middleware;
-		let helpers = data.helpers;
+	MaxonBinary.customAPIRoutes = function (data, callback) {
+		const router = data.router;
+		const middleware = data.middleware;
+		// let helpers = data.helpers;
 
 		// POST request to <backstage>/api/V3/plugins/downloadstats
-		router.post('/downloadstats', middleware.authenticate, function(req, res) {
+		router.post('/downloadstats', middleware.authenticate, function (req, res) {
 			// check user making the post request
 			// likely an authenticated user with API Access token
-			if (req.user.uid !== undefined){
+			if (req.user.uid !== undefined) {
 				if (debugOutput) {
-					winston.verbose("[maxonBinary] User [" + req.user.uid + "] reached /downloadstats route.");
+					winston.verbose('[maxonBinary] User [' + req.user.uid + '] reached /downloadstats route.');
 				}
 
 				// init download log filter variables:
@@ -356,35 +283,35 @@ function isValidDate(d) {
 				//     from date (fromTS),
 				//     to date (toTS),
 				//     binary type (binaryType))
-				let uid = 0, fromTS = 0.0, toTS = 0.0, binaryType = "";
+				let uid = 0; let fromTS = 0.0; let toTS = 0.0; let
+					binaryType = '';
 
 				// Fill download log filter variables with body params
-				if (req.body.uid !== undefined){
+				if (req.body.uid !== undefined) {
 					uid = req.body.uid;
 				}
-				if (req.body.from !== undefined){
+				if (req.body.from !== undefined) {
 					const fromDate = new Date(req.body.from);
-					if (isValidDate(fromDate)){
+					if (isValidDate(fromDate)) {
 						fromTS = fromDate.getTime();
 					} else {
 						winston.error('[maxonBinary] Wrong format of "body.from". Set as YYYY-MM-DDTHH:mm:ss');
 						res.sendStatus(404);
 					}
 				}
-				if (req.body.to !== undefined){
+				if (req.body.to !== undefined) {
 					const toDate = new Date(req.body.to);
-					if (isValidDate(toDate)){
+					if (isValidDate(toDate)) {
 						toTS = toDate.getTime();
 					} else {
 						winston.error('[maxonBinary] Wrong format of "body.to". Set as YYYY-MM-DDTHH:mm:ss');
 						res.sendStatus(404);
 					}
 				}
-				if (req.body.binarytype !== undefined){
-					if (Object.keys(constants.binaryLocations).includes(req.body.binarytype)){
+				if (req.body.binarytype !== undefined) {
+					if (Object.keys(constants.binaryLocations).includes(req.body.binarytype)) {
 						binaryType = req.body.binarytype;
-					}
-					else{
+					} else {
 						winston.error('[maxonBinary] Binary type [' + req.body.binarytype + '] not supported.');
 						res.sendStatus(404);
 					}
@@ -400,7 +327,7 @@ function isValidDate(d) {
 						if (err) {
 							return callback(err);
 						}
-						if (uid > 0){
+						if (uid > 0) {
 							user.getUserField(uid, 'last_download_file', function (err, last_download_file) {
 								if (err) {
 									return callback(err);
@@ -409,27 +336,25 @@ function isValidDate(d) {
 									if (err) {
 										return callback(err);
 									}
-									retVal = [{"last_download_file": last_download_file, "last_download_time": last_download_time}];
-									let filteredDownloads = filterDownloadData(downloadEntries, uid, fromTS, toTS, binaryType);
+									retVal = [{ last_download_file: last_download_file, last_download_time: last_download_time }];
+									const filteredDownloads = FilterDownloadData(downloadEntries, uid, fromTS, toTS, binaryType);
 									retVal.push(filteredDownloads);
 									res.send(retVal);
 								});
 							});
 						} else {
-							let filteredDownloads = filterDownloadData(downloadEntries, uid, fromTS, toTS, binaryType);
+							const filteredDownloads = FilterDownloadData(downloadEntries, uid, fromTS, toTS, binaryType);
 							res.send(filteredDownloads);
 						}
 					});
 				});
-			}
-			else{
-				winston.error("[maxonBinary] Undefined req.user.uid");
+			} else {
+				winston.error('[maxonBinary] Undefined req.user.uid');
 				res.sendStatus(404);
 			}
 		});
-		
+
 		winston.info('[maxonBinary] Maxon Binary routes added.');
 		callback(null);
 	};
-
 }(module.exports));

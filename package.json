@@ -29,11 +29,12 @@
   },
   "devDependencies": {
     "@commitlint/config-angular": "^8.3.4",
+    "azure-storage": "^2.10.3",
+    "eslint": "^7.27.0",
     "eslint-config-airbnb-base": "^14.1.0",
     "eslint-plugin-import": "^2.20.1",
     "husky": "^4.2.3",
-    "lint-staged": "^10.0.8",
-    "azure-storage": "^2.10.3"
+    "lint-staged": "^10.0.8"
   },
   "husky": {
     "hooks": {
