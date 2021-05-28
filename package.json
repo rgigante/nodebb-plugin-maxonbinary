@@ -1,6 +1,6 @@
 {
   "name": "nodebb-plugin-maxonbinary",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Maxon Binaries plugin",
   "main": "library.js",
   "repository": {
